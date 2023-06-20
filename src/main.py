@@ -63,6 +63,9 @@ def main():
     print("press 7 to test LDR") 
     print("press 8 to test servo & DC motor") 
     print("press 9 to test temp & humidity")   
+    print("press # to test slide switch")  
+    print("print * to test IR sensor")
+
 
     while(True):
         lcd.lcd_clear()
@@ -142,6 +145,19 @@ def main():
             lcd.lcd_display_string("Temperature "  +str(temperature), 1)  
             lcd.lcd_display_string("Humidity "  +str(humidity), 2) 
             time.sleep(2)  
+
+        elif (keyvalue == "#"):
+            sw_switch = input_switch.read_slide_switch()
+            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)    
+            lcd.lcd_display_string("switch "  +str(sw_switch), 2) 
+            time.sleep(2)  
+        
+        elif (keyvalue == "*"):
+            ir_value = ir_sensor.get_ir_sensor_state()
+            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)    
+            lcd.lcd_display_string("ir sensor "  +str(ir_value), 2) 
+            time.sleep(2)  
+
 
         time.sleep(1)
 
