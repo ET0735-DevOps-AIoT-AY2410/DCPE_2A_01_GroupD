@@ -56,6 +56,7 @@ def main():
 
     time.sleep(3)
 
+    print("press 0 to test accelerometer")
     print("press 1 to test LED")
     print("press 2 to test potentiometer")
     print("press 3 to test buzzer")
