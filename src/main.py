@@ -42,7 +42,7 @@ def borrow_book_from_db(userId):
         sleep(5)
         set_motor_speed(0)  # to stop the dispensing motor
         set_led_output(GPIO.LOW)  #turn led off
-        my_lcd.lcd_display_string("Dispensing complete", 1) #display on lcd
+        my_lcd.lcd_display_string("Dispensing complete", 2) #display on lcd
         
         # Update book status
         booksDB.updateItem({"_id": reserved_book_id}, {"status": "borrowed"}) 
