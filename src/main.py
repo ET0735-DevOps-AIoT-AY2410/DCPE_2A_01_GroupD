@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from hal import hal_rfid_reader as rfid_reader
 from hal import hal_led as led
 from hal import hal_lcd as LCD
+import time 
 
 booksDB = MongoDB('books')
 usersDB = MongoDB('users')
@@ -25,8 +26,20 @@ def handlePayment(userId):
         my_lcd.lcd_display_string("You need to pay your loan", 1)
         my_lcd.lcd_display_string("Tap RFID card", 2)
 
-        # Continuously read RFID until a valid ID is detected
+        # Start the timer
+        start_time = time.time()
+
+        # Continuously read RFID until a valid ID is detected or timeout occurs
         while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            # Check if timeout (90 seconds) has been reached
+            if elapsed_time >= 90:
+                my_lcd.lcd_clear()
+                my_lcd.lcd_display_string("Timeout. Please try again.", 1)
+                break#need to reset the whole system after this break
+
             id = reader.read_id_no_block()
             id = str(id)
 
