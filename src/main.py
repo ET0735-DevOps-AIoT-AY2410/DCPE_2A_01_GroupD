@@ -27,8 +27,44 @@ def dispenseBook(bookId):
     sleep(5)
     my_lcd.lcd_clear()
 
+# deductFromCard returns False when an error occurs
+def deductFromCard(cardBal: float, loanDue: float, dataDict: dict):
+    
+    # Determine new balance of card
+    newBal = ('%f' % (cardBal - loanDue)).rstrip('0').rstrip('.') # Weird trick to format float
+    dataDict['cash'] = newBal
+    writeData = json.dumps(dataDict) # Prepare data to be written
+
+    # Try about 100 times
+    for _ in range(100):
+        foundFlag = False
+        id, data = my_reader.read_no_block()
+
+        # Guards invalid data (or no data)
+        if not data:
+            # If data does not exist
+            continue
+        elif "Error" in data:
+            # If error detected in read
+            print("Error detected")
+            continue
+        else:
+            foundFlag = True
+            break
+
+    if not foundFlag:
+        return False
+    
+    # Card should still be on the reader at this point
+    try:
+        my_reader.write(writeData)
+    except IndexError:
+        return False
+    else:
+        return True
+
 # handlePayment returns True when user does not have a loan
-def handlePayment(userId) -> bool:
+def handlePaymentProcess(userId) -> bool:
     my_lcd.lcd_clear()
 
     # Retrieve user information from the database based on userId
@@ -54,7 +90,8 @@ def handlePayment(userId) -> bool:
         # Check if timeout (30 seconds) has been reached
         if elapsed_time >= 30:
             my_lcd.lcd_clear()
-            my_lcd.lcd_display_string("Timeout. Please try again.", 1)
+            my_lcd.lcd_display_string("Timeout, please", 1)
+            my_lcd.lcd_display_string("try again.", 2)
             break # need to reset the whole system after this break
 
         id, data = my_reader.read_no_block()
@@ -69,6 +106,7 @@ def handlePayment(userId) -> bool:
             continue
         elif data.find("{") == -1 or data.find("}") == -1:
             # If card is not json object
+            print("Cannot find \{\} in card")
             continue
 
         data = data[data.find("{"):data.find("}")+1]
@@ -76,7 +114,7 @@ def handlePayment(userId) -> bool:
 
 
         # Assume keypair is of correct type
-        if float(dataDict.get('cash')) < float(user.get('loan')):
+        if (cardBal := float(dataDict.get('cash'))) < (loanDue := float(user.get('loan'))):
             # Insufficient funds
             my_lcd.lcd_clear()
             my_lcd.lcd_display_string("Low funds,", 1)
@@ -89,6 +127,11 @@ def handlePayment(userId) -> bool:
         else:
 
             # Subtract from RFID
+            status = deductFromCard(cardBal, loanDue, dataDict)
+            if not status:
+                print("Error occurred")
+                continue
+
             my_lcd.lcd_clear()
             my_lcd.lcd_display_string("Thank you!", 1)
             my_lcd.lcd_display_string("Payment done!", 2)
@@ -110,6 +153,11 @@ def borrow_book_from_db(userId):
 
             dispenseThread = Thread(target= dispenseBook, args=(book['id']))
             dispenseThread.start()
+            """ REMEMBER TO UNCOMMENT THIS 
+            
+            
+            
+            """
             
             # booksDB.updateItem(search={'id':book['id']},
             #                 doc={'status':{}})  # Update book status
@@ -187,7 +235,7 @@ if __name__ == "__main__":
 
     # process_bar_code("barcode01.png")
     init()
-    handlePayment("P2302223")
+    handlePaymentProcess("P2302223")
     # main()
     # borrow_book_from_db("P2302223")
     # usersDB.appendItem(search={'studentId':"P2302223"}, doc={'borrowedBooks':{
