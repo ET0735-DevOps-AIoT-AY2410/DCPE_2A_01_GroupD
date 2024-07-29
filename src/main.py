@@ -10,28 +10,26 @@ from hal import hal_lcd as PiLcd
 from hal import hal_rfid_reader as PiReader
 import RPi.GPIO as GPIO
 from threading import Thread
+from queue import Queue
 
 booksDB = MongoDB('books')
 usersDB = MongoDB('users')
 currentDate = datetime.now()
+lcdMessageQueue = Queue()
 
 # FOR PI: SCAN CARD-> HANDLE LOAN -> BORROW BOOK -> DISPENSE BOOK
 def defaultLCDMessage():
-    my_lcd.lcd_clear()
-    my_lcd.lcd_display_string("Tap RFID", 1)
-    my_lcd.lcd_display_string("w Student Card", 2)
+    lcdMessageQueue.put((0,"Tap RFID", "w Student Card", "clr"))
 
 def dispenseBook(bookId):
-    my_lcd.lcd_clear()
-    my_lcd.lcd_display_string(f"Book ID: {bookId}", 1) #display on lcd
+    lcdMessageQueue.put((0,f"Book ID: {bookId}","","clr"))
     PiMotor.set_motor_speed(100)  # set motor to dispense book
     PiLed.set_output(24,1) #turn led on
     sleep(1)
     PiMotor.set_motor_speed(0)  # to stop the dispensing motor
     PiLed.set_output(24,0)  #turn led off
-    my_lcd.lcd_display_string("Dispensed!", 2) #display on lcd
-    sleep(2)
-    defaultLCDMessage()
+
+    lcdMessageQueue.put((2,"","Dispensed!",""))
 
 # deductFromCard returns False when an error occurs
 def deductFromCard(cardBal: float, loanDue: float, dataDict: dict):
@@ -69,11 +67,27 @@ def deductFromCard(cardBal: float, loanDue: float, dataDict: dict):
     else:
         return True
 
+
+def LCD_Message_Worker():
+    def LCDPrint(duration: float = 0, msg1: str = "", msg2: str = "", *args):
+        if args:
+            if args[0] == "clr":
+                my_lcd.lcd_clear()
+        my_lcd.lcd_display_string(msg1,1)
+        my_lcd.lcd_display_string(msg2,2)
+        sleep(duration)
+
+
+    while True:
+        # Get stuff 
+        LCDPrint(*lcdMessageQueue.get())
+        lcdMessageQueue.task_done()
+
+
+
 # handlePayment returns True when user does not have a loan or 
 # when payment is finished
 def handlePaymentProcess(userId) -> bool:
-    my_lcd.lcd_clear()
-
     # Retrieve user information from the database based on userId
     users = usersDB.getItems(filter={"studentId": userId})
     user = users[0]
@@ -82,10 +96,8 @@ def handlePaymentProcess(userId) -> bool:
     if not (loanDue := user.get('loan')):
         return True
     
-
-    my_lcd.lcd_display_string(f"Loan: ${loanDue}", 1)
-    my_lcd.lcd_display_string("Tap RFID card", 2)
-    sleep(1) # Added so that you tap at 2 separate instances
+    lcdMessageQueue.put((0,f"Loan: ${loanDue}","Tap RFID card","clr"))
+    # Delay added so that you tap at 2 separate instances
     # Start the timer
     start_time = time()
 
@@ -96,9 +108,7 @@ def handlePaymentProcess(userId) -> bool:
 
         # Check if timeout (30 seconds) has been reached
         if elapsed_time >= 30:
-            my_lcd.lcd_clear()
-            my_lcd.lcd_display_string("Timeout, please", 1)
-            my_lcd.lcd_display_string("try again.", 2)
+            lcdMessageQueue.put((1,f"Timeout, please","try again","clr"))
             return False # need to reset the whole system after this break
 
         id, data = my_reader.read_no_block()
@@ -121,13 +131,7 @@ def handlePaymentProcess(userId) -> bool:
         # Assume keypair is of correct type
         if (cardBal := float(dataDict.get('cash'))) < float(loanDue):
             # Insufficient funds
-            my_lcd.lcd_clear()
-            my_lcd.lcd_display_string("Low funds,", 1)
-            my_lcd.lcd_display_string("Please try again", 2)
-            sleep(2)
-            my_lcd.lcd_clear()
-            my_lcd.lcd_display_string("Settle loans,", 1)
-            my_lcd.lcd_display_string("Tap RFID card", 2)
+            lcdMessageQueue.put((2,"Low funds,","Please try again","clr"))
             continue
         else:
 
@@ -139,10 +143,7 @@ def handlePaymentProcess(userId) -> bool:
             
             # Clear user's loan from database
             usersDB.unsetItem({"studentId": userId}, "loan")
-
-            my_lcd.lcd_clear()
-            my_lcd.lcd_display_string("Thank you!", 1)
-            my_lcd.lcd_display_string("Payment done!", 2)
+            lcdMessageQueue.put((2,"Thank you!","Payment done!","clr"))
             break  # Exit the loop after successful payment
     return True
         
@@ -172,7 +173,7 @@ def borrow_book_from_db(userId):
             #     book['id']: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
             # }}) # Add book to user borrowedBooks
     else:
-        my_lcd.lcd_display_string("No reservations", 1) #display on lcd if no book reservations
+        lcdMessageQueue.put((1,"Found 0","Reservations!","clr")) #display on lcd if no book reservations
 
 # authUserProcess gets the userId of the collector via RFID and returns its value
 # This function is the start of the entire process       
@@ -202,10 +203,8 @@ def authUserProcess() -> str:
             break # Break the loop to proceed
     
     # Information to user
-    my_lcd.lcd_clear()
-    my_lcd.lcd_display_string("Registered as", 1)
-    my_lcd.lcd_display_string(f"{userId}", 2)
-    sleep(2) # Pause for a short while
+    lcdMessageQueue.put((2,"Registered as",f"{userId}","clr"))
+    # Pause for a short while
     return userId # Return the value of userId to be used
 
 def process_bar_code(image):
@@ -231,10 +230,12 @@ def main():
     # While true
     while True:
         userId = authUserProcess()
+        sleep(2)
         status = handlePaymentProcess(userId)
         if status:
             # Payment has been made
             borrow_book_from_db(userId)
+            sleep(2)
         else:
             # Payment was not made
             continue # Start from beginning
@@ -260,6 +261,9 @@ def init():
     my_lcd.lcd_display_string("Initialising", 1)
     my_lcd.lcd_display_string("...", 2)
 
+    # Start LCD_Message_Worker
+    Thread(target=LCD_Message_Worker, daemon=False).start()
+
     # Init Camera
     pass
 
@@ -281,8 +285,9 @@ if __name__ == "__main__":
 
     """)
 
-    main()
-
+    # main()
+    # for i in range(100):
+    #     lcdMessageQueue.put((0,f"{i}","World"))
     # process_bar_code("barcode01.png")
     
     # handlePaymentProcess("P2302223")
