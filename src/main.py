@@ -167,13 +167,17 @@ def borrow_book_from_db(userId):
             # }}) # Add book to user borrowedBooks
     else:
         my_lcd.lcd_display_string("No reservations", 1) #display on lcd if no book reservations
-       
-def authUserProcess():
+
+# authUserProcess gets the userId of the collector via RFID and returns its value
+# This function is the start of the entire process       
+def authUserProcess() -> str:
+    # Instructions for user
     my_lcd.lcd_clear()
     my_lcd.lcd_display_string("Tap RFID", 1)
     my_lcd.lcd_display_string("w Student Card", 2)
     data = None
-    while True: # Check for userId
+    # Check for userId
+    while True: 
         while not data:
             id, data = my_reader.read() # Wait for data
 
@@ -189,14 +193,16 @@ def authUserProcess():
         data = data[data.find("{"):data.find("}")+1]
         dataDict = json.loads(data) # Load data as json object
 
+        # If the data contains a value for userId
         if userId := dataDict.get('userId'):
-            break
+            break # Break the loop to proceed
     
+    # Information to user
     my_lcd.lcd_clear()
     my_lcd.lcd_display_string("Registered as", 1)
     my_lcd.lcd_display_string(f"{userId}", 2)
-    sleep(2)
-
+    sleep(2) # Pause for a short while
+    return userId # Return the value of userId to be used
 
 def process_bar_code(image):
     pass
