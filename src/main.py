@@ -13,6 +13,14 @@ usersDB = MongoDB('users')
 currentDate = datetime.now()
 
 # FOR PI: SCAN CARD-> HANDLE LOAN -> BORROW BOOK -> DISPENSE BOOK
+def dispenseBook(book):
+    my_lcd.lcd_display_string("Dispensing Book with ID: {reserved_book_id}", 1) #display on lcd
+    PiMotor.set_motor_speed(100)  # set motor to dispense book
+    PiLed.set_output(24,1) #turn led on
+    sleep(1)
+    PiMotor.set_motor_speed(0)  # to stop the dispensing motor
+    PiLed.set_output(24,0)  #turn led off
+    my_lcd.lcd_display_string("Dispensing complete", 2) #display on lcd
 
 def handlePayment(userId):
     # TO BE COMPLETED
@@ -31,17 +39,10 @@ def borrow_book_from_db(userId):
     my_lcd.lcd_clear()
     bookCriteria = {"status.reserved":userId}
     books = booksDB.getItems(filter=bookCriteria)
-    if len(book) > 0:
+    if len(books) > 0:
         for book in books:
             print(f"Dispensing book with name: {book['name']}")
-
-            my_lcd.lcd_display_string("Dispensing Book with ID: {reserved_book_id}", 1) #display on lcd
-            PiMotor.set_motor_speed(100)  # set motor to dispense book
-            PiLed.set_output(24,1) #turn led on
-            sleep(1)
-            PiMotor.set_motor_speed(0)  # to stop the dispensing motor
-            PiLed.set_output(24,0)  #turn led off
-            my_lcd.lcd_display_string("Dispensing complete", 2) #display on lcd
+            dispenseBook(book)
             
             booksDB.updateItem(search={'id':book['id']},
                             doc={'status':{}})  # Update book status
@@ -110,6 +111,9 @@ if __name__ == "__main__":
     # process_bar_code("barcode01.png")
     init()
     # main()
-    # borrow_book_from_db("P2302223")
+    borrow_book_from_db("P2302223")
+    # usersDB.appendItem(search={'studentId':"P2302223"}, doc={'borrowedBooks':{
+    #             4: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
+    #         }})
     # testDb = MongoDB()
     # testDb.updateItem(search={"_id": { "$oid": "663a60797c645edcd6132b1a" }}, doc={"text":"GOODBYE WORLD"})
