@@ -225,6 +225,40 @@ def ADMIN_setup_card():
         }
     y = json.dumps(x)
     my_reader.write(y)
+
+def ADMIN_returnBook(userId: str):
+    # From userId, retrieve borrowed books
+    totalLoan = 0
+    users = usersDB.getItems(filter={"studentId": userId})
+    for user in users:
+        # Expect only one user
+        borrowedBooks = user.get("borrowedBooks")
+        for date in borrowedBooks.values():
+            dueDate = datetime.strptime(date, "%d/%m/%y")
+            loanDays = (currentDate - dueDate).days
+            if loanDays > 0:
+                # Payment to be made
+                loan = loanDays * 0.15
+                print(f"You have accumulated a loan of ${loan}")
+                # Calculate and update loan
+                totalLoan += loan
+        
+        print(totalLoan)
+        # Remove book from user's inventory
+        
+        
+
+        # Return the actual book
+        # for book in bookList:
+        #     if book.id == bookId:
+        #         book.status['available'] = 1
+        #         print(f"Book {book.id} has been returned")
+        #         break
+        #     else:
+        #         # print("Book is not registered in the system")
+        #         pass
+        # self.borrowedBooks.pop(bookDIndex)
+        # return
     
 def main():
     # While true
@@ -262,7 +296,7 @@ def init():
     my_lcd.lcd_display_string("...", 2)
 
     # Start LCD_Message_Worker
-    Thread(target=LCD_Message_Worker, daemon=False).start()
+    # Thread(target=LCD_Message_Worker, daemon=False).start()
 
     # Init Camera
     pass
@@ -285,6 +319,10 @@ if __name__ == "__main__":
 
     """)
 
+    ADMIN_returnBook("P2302627")
+    # usersDB.appendItem(search={"studentId":"P2302627"}, doc={'borrowedBooks':{
+    #             4: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
+    #         }})
     # main()
     # for i in range(100):
     #     lcdMessageQueue.put((0,f"{i}","World"))
