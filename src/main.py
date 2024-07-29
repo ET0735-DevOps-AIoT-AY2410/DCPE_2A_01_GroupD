@@ -97,12 +97,10 @@ def handlePaymentProcess(userId) -> bool:
         id, data = my_reader.read_no_block()
 
         # Guard incorrect data
-        if not data:
-            # If data exists
+        if not data: # If data exists
             continue
-        elif "Error" in data:
-            # If error detected in read
-            print("Error detected")
+        elif "Error" in data: # If error detected in read
+            print("Error detected in read")
             continue
         elif data.find("{") == -1 or data.find("}") == -1:
             # If card is not json object
