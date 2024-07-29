@@ -72,11 +72,11 @@ def handlePaymentProcess(userId) -> bool:
     user = users[0]
 
     # Check if the user has a loan and reserved books
-    if not user.get('loan'):
+    if not (loanDue := user.get('loan')):
         return True
     
 
-    my_lcd.lcd_display_string("Settle loans", 1)
+    my_lcd.lcd_display_string(f"Loan: ${loanDue}", 1)
     my_lcd.lcd_display_string("Tap RFID card", 2)
 
     # Start the timer
@@ -112,7 +112,7 @@ def handlePaymentProcess(userId) -> bool:
 
 
         # Assume keypair is of correct type
-        if (cardBal := float(dataDict.get('cash'))) < (loanDue := float(user.get('loan'))):
+        if (cardBal := float(dataDict.get('cash'))) < float(loanDue):
             # Insufficient funds
             my_lcd.lcd_clear()
             my_lcd.lcd_display_string("Low funds,", 1)
@@ -166,6 +166,9 @@ def borrow_book_from_db(userId):
     else:
         my_lcd.lcd_display_string("No reservations", 1) #display on lcd if no book reservations
        
+def authUser():
+    pass
+
 
 def process_bar_code(image):
     pass
