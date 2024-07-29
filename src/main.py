@@ -14,13 +14,13 @@ currentDate = datetime.now()
 
 # FOR PI: SCAN CARD-> HANDLE LOAN -> BORROW BOOK -> DISPENSE BOOK
 def dispenseBook(book):
-    my_lcd.lcd_display_string("Dispensing Book with ID: {reserved_book_id}", 1) #display on lcd
+    my_lcd.lcd_display_string(f"Book ID: {book['id']}", 1) #display on lcd
     PiMotor.set_motor_speed(100)  # set motor to dispense book
     PiLed.set_output(24,1) #turn led on
     sleep(1)
     PiMotor.set_motor_speed(0)  # to stop the dispensing motor
     PiLed.set_output(24,0)  #turn led off
-    my_lcd.lcd_display_string("Dispensing complete", 2) #display on lcd
+    my_lcd.lcd_display_string("Completed!", 2) #display on lcd
 
 def handlePayment(userId):
     # TO BE COMPLETED
