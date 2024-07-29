@@ -24,29 +24,31 @@ def handlePayment(userId):
 
             # FUNCTION TO DEAL WITH RFID READER HERE
 
-
             # User can proceed to borrow book
 
 
 def borrow_book_from_db(userId):
     my_lcd.lcd_clear()
-    user = usersDB.getItems(filter={"userId": userId}) #get user
-    user = user[0]
-    if "reservedBooks" in user and user["reservedBooks"]: #checks if user has any books reserved
-        reserved_book_id = user["reservedBooks"][0]
-        print(f"Dispensing book with ID: {reserved_book_id}")
-        my_lcd.lcd_display_string("Dispensing Book with ID: {reserved_book_id}", 1) #display on lcd
-        set_motor_speed(100)  # set motor to dispense book
-        set_led_output(GPIO.HIGH) #turn led on
-        sleep(5)
-        set_motor_speed(0)  # to stop the dispensing motor
-        set_led_output(GPIO.LOW)  #turn led off
-        my_lcd.lcd_display_string("Dispensing complete", 2) #display on lcd
+    bookCriteria = {"status.reserved":userId}
+    books = booksDB.getItems(filter=bookCriteria)
+    if len(book) > 0:
+        for book in books:
+            print(f"Dispensing book with name: {book['name']}")
+
+            my_lcd.lcd_display_string("Dispensing Book with ID: {reserved_book_id}", 1) #display on lcd
+            PiMotor.set_motor_speed(100)  # set motor to dispense book
+            PiLed.set_output(24,1) #turn led on
+            sleep(1)
+            PiMotor.set_motor_speed(0)  # to stop the dispensing motor
+            PiLed.set_output(24,0)  #turn led off
+            my_lcd.lcd_display_string("Dispensing complete", 2) #display on lcd
+            
+            booksDB.updateItem(search={'id':book['id']},
+                            doc={'status':{}})  # Update book status
         
-        booksDB.updateItem({"_id": reserved_book_id}, {"status": "borrowed"})  # Update book status
-        usersDB.updateItem({"_id": userId}, {"reservedBooks": user['reservedBooks']})
-       
-        usersDB.appendItem({"_id": userId}, {"borrowedBooks": reserved_book_id}) # Add book to user borrowedBooks
+            usersDB.appendItem(search={'studentId':userId}, doc={'borrowedBooks':{
+                book['id']: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
+            }}) # Add book to user borrowedBooks
     else:
         my_lcd.lcd_display_string("No reservations", 1) #display on lcd if no book reservations
        
@@ -74,7 +76,7 @@ def init():
     # Init LCD
     global my_lcd
     my_lcd = PiLcd.lcd()
-    
+
     # Init LED
     PiLed.init()
 
