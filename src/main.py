@@ -129,13 +129,13 @@ def handlePaymentProcess(userId) -> bool:
             if not status:
                 print("Error occurred")
                 continue
+            
+            # Clear user's loan from database
+            usersDB.unsetItem({"studentId": userId}, "loan")
 
             my_lcd.lcd_clear()
             my_lcd.lcd_display_string("Thank you!", 1)
             my_lcd.lcd_display_string("Payment done!", 2)
-            
-            # Update the user's loan to 0 in the database
-            # usersDB.updateItem({"_id": userId}, {"$set": {"loan": 0}})
             break  # Exit the loop after successful payment
         
 
