@@ -1,9 +1,11 @@
+from dotenv import load_dotenv
+load_dotenv()
 from mongoApi import MongoDB
 from datetime import date, datetime, timedelta
 from time import sleep
-from hal import hal_dc_motor as init_motor, set_motor_speed
-from hal import hal_lcd as init_led, set_led_output
-from hal import hal_lcd as lcd 
+from hal import hal_dc_motor as PiMotor
+from hal import hal_led as PiLed
+from hal import hal_lcd as PiLcd 
 import RPi.GPIO as GPIO
 
 booksDB = MongoDB('books')
@@ -27,9 +29,6 @@ def handlePayment(userId):
 
 
 def borrow_book_from_db(userId):
-    init_motor()
-    init_led()
-    my_lcd = lcd()
     my_lcd.lcd_clear()
     user = usersDB.getItems(filter={"userId": userId}) #get user
     user = user[0]
@@ -73,6 +72,8 @@ def main():
 
 def init():
     # Init LCD
+    global my_lcd
+    my_lcd = PiLcd.lcd()
     # Display 
     # "Welcome to SP library"
     # "Please scan card to proceed"
@@ -87,8 +88,8 @@ if __name__ == "__main__":
 
 
     """)
-    booksDB.listItems()
-    usersDB.listItems()
+    # booksDB.listItems()
+    # usersDB.listItems()
     
     print("""
 
@@ -97,8 +98,8 @@ if __name__ == "__main__":
 
     """)
 
-    process_bar_code("barcode01.png")
-    # init()
+    # process_bar_code("barcode01.png")
+    init()
     # main()
     # borrow_book_from_db("P2302223")
     # testDb = MongoDB()
