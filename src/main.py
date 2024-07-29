@@ -16,16 +16,22 @@ usersDB = MongoDB('users')
 currentDate = datetime.now()
 
 # FOR PI: SCAN CARD-> HANDLE LOAN -> BORROW BOOK -> DISPENSE BOOK
+def defaultLCDMessage():
+    my_lcd.lcd_clear()
+    my_lcd.lcd_display_string("Tap RFID", 1)
+    my_lcd.lcd_display_string("w Student Card", 2)
+
 def dispenseBook(bookId):
+    my_lcd.lcd_clear()
     my_lcd.lcd_display_string(f"Book ID: {bookId}", 1) #display on lcd
     PiMotor.set_motor_speed(100)  # set motor to dispense book
     PiLed.set_output(24,1) #turn led on
     sleep(1)
     PiMotor.set_motor_speed(0)  # to stop the dispensing motor
     PiLed.set_output(24,0)  #turn led off
-    my_lcd.lcd_display_string("Completed!", 2) #display on lcd
-    sleep(5)
-    my_lcd.lcd_clear()
+    my_lcd.lcd_display_string("Dispensed!", 2) #display on lcd
+    sleep(2)
+    defaultLCDMessage()
 
 # deductFromCard returns False when an error occurs
 def deductFromCard(cardBal: float, loanDue: float, dataDict: dict):
@@ -79,7 +85,7 @@ def handlePaymentProcess(userId) -> bool:
 
     my_lcd.lcd_display_string(f"Loan: ${loanDue}", 1)
     my_lcd.lcd_display_string("Tap RFID card", 2)
-
+    sleep(1) # Added so that you tap at 2 separate instances
     # Start the timer
     start_time = time()
 
@@ -172,9 +178,7 @@ def borrow_book_from_db(userId):
 # This function is the start of the entire process       
 def authUserProcess() -> str:
     # Instructions for user
-    my_lcd.lcd_clear()
-    my_lcd.lcd_display_string("Tap RFID", 1)
-    my_lcd.lcd_display_string("w Student Card", 2)
+    defaultLCDMessage()
     data = None
     # Check for userId
     while True: 
@@ -225,9 +229,16 @@ def ADMIN_setup_card():
     
 def main():
     # While true
-    # Loop camera
+    while True:
+        userId = authUserProcess()
+        status = handlePaymentProcess(userId)
+        if status:
+            # Payment has been made
+            borrow_book_from_db(userId)
+        else:
+            # Payment was not made
+            continue # Start from beginning
     # If camera detects card, check loans (pay loans via RFID, or timeout and restart) -> dispense books -> updateDB
-    pass
 
 def init():
     # Init LCD
@@ -245,31 +256,35 @@ def init():
     my_reader = PiReader.init()
 
     # Display 
-    # "Welcome to SP library"
-    # "Please scan card to proceed"
+    my_lcd.lcd_clear()
+    my_lcd.lcd_display_string("Initialising", 1)
+    my_lcd.lcd_display_string("...", 2)
 
     # Init Camera
     pass
 
 if __name__ == "__main__":
-    print("""
+    print(
+    """
 
-    -PROGRAM START-
-
+    -INITIALISING-
 
     """)
+    init()
     # booksDB.listItems()
     # usersDB.listItems()
     
-    print("""
+    print(
+    """
 
-    -STUFF HAPPENS-
-
+    -CALLING MAIN-
 
     """)
 
+    main()
+
     # process_bar_code("barcode01.png")
-    init()
+    
     # handlePaymentProcess("P2302223")
     # main()
     # borrow_book_from_db("P2302223")
