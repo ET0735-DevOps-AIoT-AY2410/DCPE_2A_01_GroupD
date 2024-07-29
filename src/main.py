@@ -74,6 +74,13 @@ def init():
     # Init LCD
     global my_lcd
     my_lcd = PiLcd.lcd()
+    
+    # Init LED
+    PiLed.init()
+
+    # Init Motor
+    PiMotor.init()
+
     # Display 
     # "Welcome to SP library"
     # "Please scan card to proceed"
