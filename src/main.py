@@ -63,7 +63,8 @@ def deductFromCard(cardBal: float, loanDue: float, dataDict: dict):
     else:
         return True
 
-# handlePayment returns True when user does not have a loan
+# handlePayment returns True when user does not have a loan or 
+# when payment is finished
 def handlePaymentProcess(userId) -> bool:
     my_lcd.lcd_clear()
 
@@ -92,7 +93,7 @@ def handlePaymentProcess(userId) -> bool:
             my_lcd.lcd_clear()
             my_lcd.lcd_display_string("Timeout, please", 1)
             my_lcd.lcd_display_string("try again.", 2)
-            break # need to reset the whole system after this break
+            return False # need to reset the whole system after this break
 
         id, data = my_reader.read_no_block()
 
@@ -127,7 +128,7 @@ def handlePaymentProcess(userId) -> bool:
             # Subtract from RFID
             status = deductFromCard(cardBal, loanDue, dataDict)
             if not status:
-                print("Error occurred")
+                print("Error: Could not deduct from card")
                 continue
             
             # Clear user's loan from database
@@ -137,6 +138,7 @@ def handlePaymentProcess(userId) -> bool:
             my_lcd.lcd_display_string("Thank you!", 1)
             my_lcd.lcd_display_string("Payment done!", 2)
             break  # Exit the loop after successful payment
+    return True
         
 
 
@@ -166,8 +168,34 @@ def borrow_book_from_db(userId):
     else:
         my_lcd.lcd_display_string("No reservations", 1) #display on lcd if no book reservations
        
-def authUser():
-    pass
+def authUserProcess():
+    my_lcd.lcd_clear()
+    my_lcd.lcd_display_string("Tap RFID", 1)
+    my_lcd.lcd_display_string("w Student Card", 2)
+    data = None
+    while True: # Check for userId
+        while not data:
+            id, data = my_reader.read() # Wait for data
+
+        # Guard incorrect data
+        if "Error" in data: # If error detected in read
+            print("Error detected in read")
+            continue
+        elif data.find("{") == -1 or data.find("}") == -1:
+            # If card is not json object
+            print("Cannot find \{\} in card")
+            continue
+
+        data = data[data.find("{"):data.find("}")+1]
+        dataDict = json.loads(data) # Load data as json object
+
+        if userId := dataDict.get('userId'):
+            break
+    
+    my_lcd.lcd_clear()
+    my_lcd.lcd_display_string("Registered as", 1)
+    my_lcd.lcd_display_string(f"{userId}", 2)
+    sleep(2)
 
 
 def process_bar_code(image):
@@ -236,7 +264,7 @@ if __name__ == "__main__":
 
     # process_bar_code("barcode01.png")
     init()
-    handlePaymentProcess("P2302223")
+    # handlePaymentProcess("P2302223")
     # main()
     # borrow_book_from_db("P2302223")
     # usersDB.appendItem(search={'studentId':"P2302223"}, doc={'borrowedBooks':{
