@@ -7,20 +7,23 @@ from hal import hal_dc_motor as PiMotor
 from hal import hal_led as PiLed
 from hal import hal_lcd as PiLcd 
 import RPi.GPIO as GPIO
+from threading import Thread
 
 booksDB = MongoDB('books')
 usersDB = MongoDB('users')
 currentDate = datetime.now()
 
 # FOR PI: SCAN CARD-> HANDLE LOAN -> BORROW BOOK -> DISPENSE BOOK
-def dispenseBook(book):
-    my_lcd.lcd_display_string(f"Book ID: {book['id']}", 1) #display on lcd
+def dispenseBook(bookId):
+    my_lcd.lcd_display_string(f"Book ID: {bookId}", 1) #display on lcd
     PiMotor.set_motor_speed(100)  # set motor to dispense book
     PiLed.set_output(24,1) #turn led on
     sleep(1)
     PiMotor.set_motor_speed(0)  # to stop the dispensing motor
     PiLed.set_output(24,0)  #turn led off
     my_lcd.lcd_display_string("Completed!", 2) #display on lcd
+    sleep(5)
+    my_lcd.lcd_clear()
 
 def handlePayment(userId):
     # TO BE COMPLETED
@@ -42,14 +45,16 @@ def borrow_book_from_db(userId):
     if len(books) > 0:
         for book in books:
             print(f"Dispensing book with name: {book['name']}")
-            dispenseBook(book)
+
+            dispenseThread = Thread(target= dispenseBook, args=(book['id']))
+            dispenseThread.start()
             
-            booksDB.updateItem(search={'id':book['id']},
-                            doc={'status':{}})  # Update book status
+            # booksDB.updateItem(search={'id':book['id']},
+            #                 doc={'status':{}})  # Update book status
         
-            usersDB.appendItem(search={'studentId':userId}, doc={'borrowedBooks':{
-                book['id']: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
-            }}) # Add book to user borrowedBooks
+            # usersDB.appendItem(search={'studentId':userId}, doc={'borrowedBooks':{
+            #     book['id']: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
+            # }}) # Add book to user borrowedBooks
     else:
         my_lcd.lcd_display_string("No reservations", 1) #display on lcd if no book reservations
        
