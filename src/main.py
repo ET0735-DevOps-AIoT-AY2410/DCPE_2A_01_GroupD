@@ -5,7 +5,8 @@ from datetime import date, datetime, timedelta
 from time import sleep
 from hal import hal_dc_motor as PiMotor
 from hal import hal_led as PiLed
-from hal import hal_lcd as PiLcd 
+from hal import hal_lcd as PiLcd
+from hal import hal_rfid_reader as rfid_reader
 import RPi.GPIO as GPIO
 from threading import Thread
 
@@ -26,16 +27,46 @@ def dispenseBook(bookId):
     my_lcd.lcd_clear()
 
 def handlePayment(userId):
-    # TO BE COMPLETED
-    pass
+    my_lcd = LCD.lcd()
+    led.init()
+    my_lcd.lcd_clear()
+    reader = rfid_reader.init()
 
-        # There should only be one user at this point
+    # Retrieve user information from the database based on userId
+    user = usersDB.getItems(filter={"userId": userId})
+    user = user[0]
 
-            # User has payment due
+    # Check if the user has a loan and reserved books
+    if "loan" in user and user["loan"] != 0 and "reservedBooks" in user and user["reservedBooks"]:
+        my_lcd.lcd_display_string("You need to pay your loan", 1)
+        my_lcd.lcd_display_string("Tap RFID card", 2)
 
-            # FUNCTION TO DEAL WITH RFID READER HERE
+        # Start the timer
+        start_time = time.time()
 
-            # User can proceed to borrow book
+        # Continuously read RFID until a valid ID is detected or timeout occurs
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            # Check if timeout (90 seconds) has been reached
+            if elapsed_time >= 90:
+                my_lcd.lcd_clear()
+                my_lcd.lcd_display_string("Timeout. Please try again.", 1)
+                break#need to reset the whole system after this break
+
+            id = reader.read_id_no_block()
+            id = str(id)
+
+            if id != "None":
+                my_lcd.lcd_clear()
+                my_lcd.lcd_display_string("Thank you for the payment", 1)
+                
+                # Update the user's loan to 0 in the database
+                usersDB.updateItem({"_id": userId}, {"$set": {"loan": 0}})
+                break  # Exit the loop after successful payment
+        
+
 
 
 def borrow_book_from_db(userId):
