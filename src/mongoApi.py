@@ -14,7 +14,7 @@ class MongoDB:
 
     data : dict
 
-    def getItems(self, filter = None):
+    def getItems(self, filter:object = None):
         temp = self.data.copy()
         temp["filter"] = filter
         response = requests.post(url=self.url+"find", headers=self.headers, json=temp)
@@ -24,13 +24,13 @@ class MongoDB:
     def listItems(self):
         print(self.getItems())    
 
-    def insertItem(self, doc):
+    def insertItem(self, doc:object):
         temp = self.data.copy()
         temp["document"] = doc
         response = requests.post(url=self.url+"insertOne", headers=self.headers, json=temp)
         return response.content
     
-    def setItem(self, search, doc):
+    def setItem(self, search:object, doc:object):
         temp = self.data.copy()
         temp["filter"] = search
         temp["update"] = {
@@ -39,7 +39,7 @@ class MongoDB:
         response = requests.post(url=self.url+"updateOne", headers=self.headers, json=temp)
         return response.content
     
-    def unsetItem(self, search, field):
+    def unsetItem(self, search:object, field:str):
         temp = self.data.copy()
         temp["filter"] = search
         temp["update"] = {
@@ -48,7 +48,7 @@ class MongoDB:
         response = requests.post(url=self.url+"updateOne", headers=self.headers, json=temp)
         return response.content
 
-    def appendItem(self, search, doc):
+    def appendItem(self, search:object, doc:object):
         temp = self.data.copy()
         temp["filter"] = search
         temp["update"] = {
@@ -65,6 +65,4 @@ class MongoDB:
 
 if __name__ == "__main__":
     db = MongoDB('books')
-    # print(db.insertItem(doc= {"time":"2:11AM wallahi im finished"}))
-    # print(db.updateItem(search= {"borrowedBooks"}))
     db.listItems()
