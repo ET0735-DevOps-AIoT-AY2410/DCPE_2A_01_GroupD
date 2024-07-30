@@ -181,6 +181,32 @@ def main():
 
 
 
+def init():
+    GPIO.setmode(GPIO.BCM)  
+    GPIO.setwarnings(False)
+    GPIO.setup(18, GPIO.OUT)  # choose GPIO pin XX as output
+
+
+def high():
+    GPIO.output(18, 1)  # Turn on buzzer
+
+
+def low():
+    GPIO.output(18, 0)  # Turn off buzzer
+
+
+def timer(duration):
+    high()
+    time.sleep(duration)  # Duration to turn on the buzzer
+    low()
+
+
+def beep(ontime, offtime, repeatnum):
+    for cnt in range(repeatnum):
+        high()
+        time.sleep(ontime)
+        low()
+        time.sleep(offtime)
 
 
 if __name__ == '__main__':
