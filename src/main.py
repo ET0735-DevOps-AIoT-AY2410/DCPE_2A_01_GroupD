@@ -240,10 +240,22 @@ def ADMIN_returnBook(userId: str):
                 # Payment to be made
                 loan = loanDays * 0.15
                 print(f"You have accumulated a loan of ${loan}")
-                # Calculate and update loan
+                # Calculate loan
                 totalLoan += loan
         
         print(totalLoan)
+        # Update loan on database
+        if currentLoan := user.get("loan"):
+            totalLoan += float(currentLoan)
+
+        usersDB.setItem(search={"studentId": userId},doc={"loan":totalLoan})
+        
+        for bookId in borrowedBooks.keys():
+            booksDB.unsetItem(search={"id":bookId},doc={"status.unavailable"})
+            usersDB.unsetItem(search={ "$and": [ {"studentId": userId, f"borrowedBooks.{bookId}": {"$exists": "true"} } ] }
+)
+
+
         # Remove book from user's inventory
         
         
