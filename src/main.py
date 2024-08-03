@@ -149,7 +149,6 @@ def handlePaymentProcess(userId) -> bool:
         
 
 
-
 def borrow_book_from_db(userId):
     my_lcd.lcd_clear()
     bookCriteria = {"status.reserved":userId}
@@ -165,15 +164,19 @@ def borrow_book_from_db(userId):
             
             
             """
-            
+            booksDB.unsetItem(search={'id':book.get("id")},field="status.reserved")
+            booksDB.setItem(search={'id':book.get("id")},doc={"status.unavailable":True})
+            usersDB.setItem(search={'studentId':userId}, doc={f"borrowedBooks.{book.get('id')}":
+                                                              (currentDate + timedelta(days=18)).strftime("%d/%m/%y")})
             # booksDB.updateItem(search={'id':book['id']},
             #                 doc={'status':{}})  # Update book status
         
             # usersDB.appendItem(search={'studentId':userId}, doc={'borrowedBooks':{
-            #     book['id']: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
+            #     book['id']: (currentDate + timedelta(days=18)).strftime("%d/%m/%y"),
             # }}) # Add book to user borrowedBooks
     else:
         lcdMessageQueue.put((1,"Found 0","Reservations!","clr")) #display on lcd if no book reservations
+
 
 # authUserProcess gets the userId of the collector via RFID and returns its value
 # This function is the start of the entire process       
@@ -207,6 +210,7 @@ def authUserProcess() -> str:
     # Pause for a short while
     return userId # Return the value of userId to be used
 
+
 def process_bar_code(image):
     pass
     # If not detected then print the message 
@@ -217,6 +221,7 @@ def process_bar_code(image):
                 # print(barcode.type)
 
                 # Should never enter here
+                
 
 def ADMIN_setup_card():
     x = {
@@ -226,6 +231,26 @@ def ADMIN_setup_card():
     y = json.dumps(x)
     my_reader.write(y)
 
+
+def calculateLoan(books:dict) -> float:
+    # Expects books to be in the example format:
+    # {"1":"01/01/01"}
+    totalLoan = 0
+    for date in books.values():
+        # Get the date
+        dueDate = datetime.strptime(date, "%d/%m/%y")
+        loanDays = (currentDate - dueDate).days
+        if loanDays > 0:
+            # Payment to be made
+            loan = loanDays * 0.15
+            print(f"You have accumulated a loan of ${loan}")
+            # Calculate loan
+            totalLoan += loan
+    
+    
+    return round(totalLoan,2)
+
+
 def ADMIN_returnUserBooks(userId: str):
     # From userId, retrieve borrowed books
     totalLoan = 0
@@ -233,16 +258,7 @@ def ADMIN_returnUserBooks(userId: str):
     for user in users:
         # Expect only one user
         borrowedBooks = user.get("borrowedBooks")
-        for date in borrowedBooks.values():
-            dueDate = datetime.strptime(date, "%d/%m/%y")
-            loanDays = (currentDate - dueDate).days
-            if loanDays > 0:
-                # Payment to be made
-                loan = loanDays * 0.15
-                print(f"You have accumulated a loan of ${loan}")
-                # Calculate loan
-                totalLoan += loan
-        
+        totalLoan = calculateLoan(borrowedBooks)
         print(totalLoan)
         # Update loan on database
         if currentLoan := user.get("loan"):
@@ -250,9 +266,39 @@ def ADMIN_returnUserBooks(userId: str):
 
         usersDB.setItem(search={"studentId": userId},doc={"loan":totalLoan})
         
+
         for bookId in borrowedBooks.keys():
-            booksDB.unsetItem(search={"id":bookId},doc={"status.unavailable"}) # Removes unavailable status from book
-            usersDB.unsetItem(search={ "$and": [ {"studentId": userId, f"borrowedBooks.{bookId}": {"$exists": "true"}}]}) # Removes book from user inventory
+            # Removes unavailable status from book
+            booksDB.unsetItem(search={"id":bookId},field="status.unavailable")
+            # Removes book from user inventory
+            usersDB.unsetItem(search={ "$and": [ {"studentId": userId, f"borrowedBooks.{bookId}": {"$exists": "true"}}]}, 
+                              field=f"borrowedBooks.{bookId}")
+
+
+def ADMIN_returnBook(bookId: str):
+    bookId = str(bookId)
+    # Get user object by the borrowedBook ID
+    users = usersDB.getItems(filter={f"borrowedBooks.{bookId}": {"$exists": "true"}})
+    for user in users:
+        # Expect only one user
+        date = user.get("borrowedBooks").pop(bookId)
+        totalLoan = calculateLoan({bookId:date})
+        print(totalLoan)
+        # Update loan on database
+        if currentLoan := user.get("loan"):
+            totalLoan += float(currentLoan)
+        
+        usersDB.setItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, doc={"loan":totalLoan})
+
+
+        # Removes unavailable status from book
+        booksDB.unsetItem(search={"id":bookId},field="status.unavailable")
+        # Removes book from user inventory
+        usersDB.unsetItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, field=f"borrowedBooks.{bookId}")
+
+
+
+        
 
     
 def main():
@@ -303,7 +349,7 @@ if __name__ == "__main__":
     -INITIALISING-
 
     """)
-    init()
+    # init()
     # booksDB.listItems()
     # usersDB.listItems()
     
@@ -314,7 +360,8 @@ if __name__ == "__main__":
 
     """)
 
-    ADMIN_returnBook("P2302627")
+    # ADMIN_returnBook("9")
+    # ADMIN_returnUserBooks("P2301334")
     # usersDB.appendItem(search={"studentId":"P2302627"}, doc={'borrowedBooks':{
     #             4: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
     #         }})
@@ -324,7 +371,6 @@ if __name__ == "__main__":
     # process_bar_code("barcode01.png")
     
     # handlePaymentProcess("P2302223")
-    # main()
     # borrow_book_from_db("P2302223")
     # usersDB.appendItem(search={'studentId':"P2302223"}, doc={'borrowedBooks':{
     #             4: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
