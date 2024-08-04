@@ -39,6 +39,15 @@ class MongoDB:
         response = requests.post(url=self.url+"updateOne", headers=self.headers, json=temp)
         return response.content
     
+    def setItems(self, search:object, doc:object):
+        temp = self.data.copy()
+        temp["filter"] = search
+        temp["update"] = {
+            "$set": doc
+        }
+        response = requests.post(url=self.url+"updateMany", headers=self.headers, json=temp)
+        return response.content
+    
     def unsetItem(self, search:object, field:str):
         temp = self.data.copy()
         temp["filter"] = search
@@ -46,6 +55,15 @@ class MongoDB:
             "$unset": {field:""}
         }
         response = requests.post(url=self.url+"updateOne", headers=self.headers, json=temp)
+        return response.content
+    
+    def unsetItems(self, search:object, field:str):
+        temp = self.data.copy()
+        temp["filter"] = search
+        temp["update"] = {
+            "$unset": {field:""}
+        }
+        response = requests.post(url=self.url+"updateMany", headers=self.headers, json=temp)
         return response.content
 
     def appendItem(self, search:object, doc:object):
