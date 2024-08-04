@@ -12,7 +12,7 @@ import RPi.GPIO as GPIO
 from threading import Thread
 from queue import Queue
 
-booksDB = MongoDB('books')
+booksDB = MongoDB('books2')
 usersDB = MongoDB('users')
 currentDate = datetime.now()
 lcdMessageQueue = Queue()
@@ -159,21 +159,11 @@ def borrow_book_from_db(userId):
 
             dispenseThread = Thread(target= dispenseBook, args=(book['id']))
             dispenseThread.start()
-            """ REMEMBER TO UNCOMMENT THIS 
-            
-            
-            
-            """
+
             booksDB.unsetItem(search={'id':book.get("id")},field="status.reserved")
-            booksDB.setItem(search={'id':book.get("id")},doc={"status.unavailable":True})
+            booksDB.setItem(search={'id':book.get("id")},doc={"status.owner":userId})
             usersDB.setItem(search={'studentId':userId}, doc={f"borrowedBooks.{book.get('id')}":
                                                               (currentDate + timedelta(days=18)).strftime("%d/%m/%y")})
-            # booksDB.updateItem(search={'id':book['id']},
-            #                 doc={'status':{}})  # Update book status
-        
-            # usersDB.appendItem(search={'studentId':userId}, doc={'borrowedBooks':{
-            #     book['id']: (currentDate + timedelta(days=18)).strftime("%d/%m/%y"),
-            # }}) # Add book to user borrowedBooks
     else:
         lcdMessageQueue.put((1,"Found 0","Reservations!","clr")) #display on lcd if no book reservations
 
@@ -268,8 +258,8 @@ def ADMIN_returnUserBooks(userId: str):
         
 
         for bookId in borrowedBooks.keys():
-            # Removes unavailable status from book
-            booksDB.unsetItem(search={"id":bookId},field="status.unavailable")
+            # Removes owner status from book
+            booksDB.unsetItem(search={"id":bookId},field="status.owner")
             # Removes book from user inventory
             usersDB.unsetItem(search={ "$and": [ {"studentId": userId, f"borrowedBooks.{bookId}": {"$exists": "true"}}]}, 
                               field=f"borrowedBooks.{bookId}")
@@ -291,8 +281,8 @@ def ADMIN_returnBook(bookId: str):
         usersDB.setItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, doc={"loan":totalLoan})
 
 
-        # Removes unavailable status from book
-        booksDB.unsetItem(search={"id":bookId},field="status.unavailable")
+        # Removes owner status from book
+        booksDB.unsetItem(search={"id":bookId},field="status.owner")
         # Removes book from user inventory
         usersDB.unsetItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, field=f"borrowedBooks.{bookId}")
 
@@ -337,7 +327,7 @@ def init():
     my_lcd.lcd_display_string("...", 2)
 
     # Start LCD_Message_Worker
-    # Thread(target=LCD_Message_Worker, daemon=False).start()
+    Thread(target=LCD_Message_Worker, daemon=False).start()
 
     # Init Camera
     pass
@@ -349,7 +339,7 @@ if __name__ == "__main__":
     -INITIALISING-
 
     """)
-    # init()
+    init()
     # booksDB.listItems()
     # usersDB.listItems()
     
@@ -360,20 +350,5 @@ if __name__ == "__main__":
 
     """)
 
-    # ADMIN_returnBook("9")
-    # ADMIN_returnUserBooks("P2301334")
-    # usersDB.appendItem(search={"studentId":"P2302627"}, doc={'borrowedBooks':{
-    #             4: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
-    #         }})
-    # main()
-    # for i in range(100):
-    #     lcdMessageQueue.put((0,f"{i}","World"))
-    # process_bar_code("barcode01.png")
-    
-    # handlePaymentProcess("P2302223")
-    # borrow_book_from_db("P2302223")
-    # usersDB.appendItem(search={'studentId':"P2302223"}, doc={'borrowedBooks':{
-    #             4: (currentDate + timedelta(days=18)).strftime("%d/%m/%Y"),
-    #         }})
-    # testDb = MongoDB()
-    # testDb.updateItem(search={"_id": { "$oid": "663a60797c645edcd6132b1a" }}, doc={"text":"GOODBYE WORLD"})
+    main()
+
