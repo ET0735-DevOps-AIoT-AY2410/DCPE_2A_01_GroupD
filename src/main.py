@@ -260,6 +260,8 @@ def ADMIN_returnUserBooks(userId: str):
         for bookId in borrowedBooks.keys():
             # Removes owner status from book
             booksDB.unsetItem(search={"id":bookId},field="status.owner")
+            # Removes loanExtension from book
+            booksDB.unsetItem(search={"id":bookId},field="status.loanExtended")
             # Removes book from user inventory
             usersDB.unsetItem(search={ "$and": [ {"studentId": userId, f"borrowedBooks.{bookId}": {"$exists": "true"}}]}, 
                               field=f"borrowedBooks.{bookId}")
@@ -283,6 +285,8 @@ def ADMIN_returnBook(bookId: str):
 
         # Removes owner status from book
         booksDB.unsetItem(search={"id":bookId},field="status.owner")
+        # Removes loanExtension from book
+        booksDB.unsetItem(search={"id":bookId},field="status.loanExtended")
         # Removes book from user inventory
         usersDB.unsetItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, field=f"borrowedBooks.{bookId}")
 
