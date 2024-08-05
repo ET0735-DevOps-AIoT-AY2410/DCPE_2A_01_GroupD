@@ -6,6 +6,15 @@ from datetime import datetime, timedelta
 from time import sleep, time
 import os
 
+try:
+    from hal import hal_dc_motor as PiMotor
+    from hal import hal_led as PiLed
+    from hal import hal_lcd as PiLcd
+    from hal import hal_rfid_reader as PiReader
+    from better_buzzer import customBuzzer as PiBuzzer
+except:
+    pass
+
 from threading import Thread
 from queue import Queue
 
@@ -18,18 +27,21 @@ lcdMessageQueue = Queue()
 def defaultRFIDMessage():
     lcdMessageQueue.put((0,"Tap RFID", "w Student Card", "clr"))
 
+
 def defaultBarcodeMessage():
     lcdMessageQueue.put((0,"Scan Barcode", "w The Camera", "clr"))
 
+
 def dispenseBook(bookId):
     lcdMessageQueue.put((0,f"Book ID: {bookId}","","clr"))
-    PiMotor.set_motor_speed(100)  # set motor to dispense book
-    PiLed.set_output(24,1) #turn led on
+    PiMotor.set_motor_speed(100)  # type: ignore # set motor to dispense book
+    PiLed.set_output(24,1) # type: ignore #turn led on
     sleep(1)
-    PiMotor.set_motor_speed(0)  # to stop the dispensing motor
-    PiLed.set_output(24,0)  #turn led off
+    PiMotor.set_motor_speed(0)  # type: ignore # to stop the dispensing motor
+    PiLed.set_output(24,0)  # type: ignore #turn led off
 
     lcdMessageQueue.put((2,"","Dispensed!",""))
+
 
 # deductFromCard returns False when an error occurs
 def deductFromCard(cardBal: float, loanDue: float, dataDict: dict):
@@ -84,7 +96,6 @@ def LCD_Message_Worker():
         lcdMessageQueue.task_done()
 
 
-
 # handlePayment returns True when user does not have a loan or 
 # when payment is finished
 def handlePaymentProcess(userId) -> bool:
@@ -133,6 +144,8 @@ def handlePaymentProcess(userId) -> bool:
         if (cardBal := float(dataDict.get('cash'))) < float(loanDue):
             # Insufficient funds
             lcdMessageQueue.put((2,"Low funds,","Please try again","clr"))
+            my_buzzer.playTone("E6",0.04)
+            my_buzzer.playTone("B5",0.46)
             continue
         else:
 
@@ -149,7 +162,6 @@ def handlePaymentProcess(userId) -> bool:
     return True
         
 
-
 def borrow_book_from_db(userId):
     my_lcd.lcd_clear()
     bookCriteria = {"status.reserved":userId}
@@ -160,6 +172,9 @@ def borrow_book_from_db(userId):
 
             dispenseThread = Thread(target= dispenseBook, args=(book['id']))
             dispenseThread.start()
+            
+            my_buzzer.playTone("B5",0.04)
+            my_buzzer.playTone("E6",0.46)
 
             booksDB.unsetItem(search={'id':book.get("id")},field="status.reserved")
             booksDB.setItem(search={'id':book.get("id")},doc={"status.owner":userId})
@@ -201,6 +216,7 @@ def authRFIDProcess() -> str:
     # Pause for a short while
     return userId # Return the value of userId to be used
 
+
 def barcodeListener() -> str:
     txt_path = os.path.join(os.path.dirname(__file__), 'images\data.txt')
     while True:
@@ -208,6 +224,7 @@ def barcodeListener() -> str:
             data = f1.read()
             if data:
                 return data
+
 
 def authBarcodeProcess() -> str:
     while True:
@@ -245,7 +262,6 @@ def calculateLoan(books:dict) -> float:
             # Calculate loan
             totalLoan += loan
     
-    
     return round(totalLoan,2)
 
 
@@ -264,7 +280,6 @@ def ADMIN_returnUserBooks(userId: str):
 
         usersDB.setItem(search={"studentId": userId},doc={"loan":totalLoan})
         
-
         for bookId in borrowedBooks.keys():
             # Removes owner status from book
             booksDB.unsetItem(search={"id":bookId},field="status.owner")
@@ -290,7 +305,6 @@ def ADMIN_returnBook(bookId: str):
         
         usersDB.setItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, doc={"loan":totalLoan})
 
-
         # Removes owner status from book
         booksDB.unsetItem(search={"id":bookId},field="status.owner")
         # Removes loanExtension from book
@@ -303,6 +317,7 @@ def main():
     # While true
     while True:
         userId = authRFIDProcess()
+        my_buzzer.playTone("C4")
         sleep(2)
         status = handlePaymentProcess(userId)
         if status:
@@ -316,11 +331,6 @@ def main():
 
 
 def init():
-    import RPi.GPIO as GPIO
-    from hal import hal_dc_motor as PiMotor
-    from hal import hal_led as PiLed
-    from hal import hal_lcd as PiLcd
-    from hal import hal_rfid_reader as PiReader
     # Init LCD
     global my_lcd
     my_lcd = PiLcd.lcd()
@@ -335,6 +345,10 @@ def init():
     global my_reader
     my_reader = PiReader.init()
 
+    # Init Buzzer
+    global my_buzzer
+    my_buzzer = PiBuzzer(20)
+
     # Display 
     my_lcd.lcd_clear()
     my_lcd.lcd_display_string("Initialising", 1)
@@ -345,6 +359,7 @@ def init():
 
     # Init Camera
     pass
+
 
 if __name__ == "__main__":
     print("""
@@ -362,4 +377,3 @@ if __name__ == "__main__":
     """)
 
     main()
-

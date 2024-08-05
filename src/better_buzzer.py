@@ -1,10 +1,10 @@
 from time import sleep
 import RPi.GPIO as GPIO #import RPi.GPIO module
 
-class customBuzzer(volume = 20):
+class customBuzzer:
     buzzerPin = 18
     dutyCycle: int
-    def __init__(self, volume):			# PWM pin connected to LED
+    def __init__(self, volume: int = 20):			# PWM pin connected to LED
         self.dutyCycle = volume
         GPIO.setwarnings(False)			#disable warnings
         GPIO.setmode(GPIO.BCM)		#set pin numbering system
@@ -40,19 +40,19 @@ class customBuzzer(volume = 20):
         return int(frequency)
 
 
-    def playTone(self, note, duration=0.075):
+    def playTone(self, note: str, durationSec=0.075):
         freq = self.__note_to_frequency(note)
         pi_pwm = GPIO.PWM(self.buzzerPin,freq)		#create PWM instance with frequency
         pi_pwm.start(0)				#start PWM of required Duty Cycle 
         pi_pwm.ChangeDutyCycle(self.dutyCycle) # Turn on buzzer
-        sleep(duration)
+        sleep(durationSec)
         pi_pwm.ChangeDutyCycle(0) # Turn off buzzer
 
 
-    def beep(self, ontime, offtime, repeatnum):
+    def beep(self, ontimeSec, offtimeSec, repeatnum):
         for cnt in range(repeatnum):
-            self.playTone("C4",duration=ontime) 
-            sleep(offtime)
+            self.playTone("C4",durationSec=ontimeSec) 
+            sleep(offtimeSec)
 
         
 
