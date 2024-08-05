@@ -4,11 +4,8 @@ import json
 from mongoApi import MongoDB
 from datetime import date, datetime, timedelta
 from time import sleep, time
-from hal import hal_dc_motor as PiMotor
-from hal import hal_led as PiLed
-from hal import hal_lcd as PiLcd
-from hal import hal_rfid_reader as PiReader
-import RPi.GPIO as GPIO
+import os
+
 from threading import Thread
 from queue import Queue
 
@@ -18,8 +15,11 @@ currentDate = datetime.now()
 lcdMessageQueue = Queue()
 
 # FOR PI: SCAN CARD-> HANDLE LOAN -> BORROW BOOK -> DISPENSE BOOK
-def defaultLCDMessage():
+def defaultRFIDMessage():
     lcdMessageQueue.put((0,"Tap RFID", "w Student Card", "clr"))
+
+def defaultBarcodeMessage():
+    lcdMessageQueue.put((0,"Scan Barcode", "w The Camera", "clr"))
 
 def dispenseBook(bookId):
     lcdMessageQueue.put((0,f"Book ID: {bookId}","","clr"))
@@ -103,6 +103,7 @@ def handlePaymentProcess(userId) -> bool:
 
     # Continuously read RFID until a valid ID is detected or timeout occurs
     while True:
+        sleep(0.25)
         current_time = time()
         elapsed_time = current_time - start_time
 
@@ -121,7 +122,7 @@ def handlePaymentProcess(userId) -> bool:
             continue
         elif data.find("{") == -1 or data.find("}") == -1:
             # If card is not json object
-            print("Cannot find \{\} in card")
+            print("Cannot find {} in card")
             continue
 
         data = data[data.find("{"):data.find("}")+1]
@@ -170,9 +171,9 @@ def borrow_book_from_db(userId):
 
 # authUserProcess gets the userId of the collector via RFID and returns its value
 # This function is the start of the entire process       
-def authUserProcess() -> str:
+def authRFIDProcess() -> str:
     # Instructions for user
-    defaultLCDMessage()
+    defaultRFIDMessage()
     data = None
     # Check for userId
     while True: 
@@ -200,17 +201,24 @@ def authUserProcess() -> str:
     # Pause for a short while
     return userId # Return the value of userId to be used
 
+def barcodeListener() -> str:
+    txt_path = os.path.join(os.path.dirname(__file__), 'images\data.txt')
+    while True:
+        with open(txt_path) as f1:
+            data = f1.read()
+            if data:
+                return data
 
-def process_bar_code(image):
-    pass
-    # If not detected then print the message 
-
-
-            # Print the barcode data 
-
-                # print(barcode.type)
-
-                # Should never enter here
+def authBarcodeProcess() -> str:
+    while True:
+        # Read in data.txt
+        data = barcodeListener()
+        if len(data) != 8: # Guard data by length
+            continue
+        # Information to user
+        lcdMessageQueue.put((2,"Registered as",f"{data}","clr"))
+        # Pause for a short while
+        return data
                 
 
 def ADMIN_setup_card():
@@ -298,7 +306,7 @@ def ADMIN_returnBook(bookId: str):
 def main():
     # While true
     while True:
-        userId = authUserProcess()
+        userId = authRFIDProcess()
         sleep(2)
         status = handlePaymentProcess(userId)
         if status:
@@ -311,6 +319,11 @@ def main():
     # If camera detects card, check loans (pay loans via RFID, or timeout and restart) -> dispense books -> updateDB
 
 def init():
+    import RPi.GPIO as GPIO
+    from hal import hal_dc_motor as PiMotor
+    from hal import hal_led as PiLed
+    from hal import hal_lcd as PiLcd
+    from hal import hal_rfid_reader as PiReader
     # Init LCD
     global my_lcd
     my_lcd = PiLcd.lcd()
@@ -337,18 +350,15 @@ def init():
     pass
 
 if __name__ == "__main__":
-    print(
-    """
+    print("""
 
     -INITIALISING-
 
     """)
-    init()
-    # booksDB.listItems()
-    # usersDB.listItems()
     
-    print(
-    """
+    init()
+    
+    print( """
 
     -CALLING MAIN-
 
