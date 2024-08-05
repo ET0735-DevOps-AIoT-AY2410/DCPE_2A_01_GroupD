@@ -1,5 +1,5 @@
 from time import sleep
-import RPi.GPIO as GPIO #import RPi.GPIO module
+import RPi.GPIO as GPIO # type: ignore
 
 class customBuzzer:
     buzzerPin = 18
