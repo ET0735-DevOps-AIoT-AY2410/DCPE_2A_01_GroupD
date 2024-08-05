@@ -18,7 +18,7 @@ class MongoDB:
         temp = self.data.copy()
         temp["filter"] = filter
         response = requests.post(url=self.url+"find", headers=self.headers, json=temp)
-        responseD = response.content.decode('ASCII')
+        responseD = response.content.decode('utf-8')
         return json.loads(responseD)["documents"]
     
     def listItems(self):
