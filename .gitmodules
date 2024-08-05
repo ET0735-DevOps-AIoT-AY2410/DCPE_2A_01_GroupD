@@ -1,3 +1,6 @@
 [submodule "src/hal"]
 	path = src/hal
 	url = https://github.com/ET0735-DevOps-AIoT/hal.git
+[submodule "src/SP_DevOps_MiniProject_GroupD_Frontend"]
+	path = src/SP_DevOps_MiniProject_GroupD_Frontend
+	url = https://github.com/Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend.git

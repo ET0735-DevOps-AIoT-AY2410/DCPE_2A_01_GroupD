@@ -1,213 +1,379 @@
-import time
+from dotenv import load_dotenv
+load_dotenv()
+import json
+from mongoApi import MongoDB
+from datetime import datetime, timedelta
+from time import sleep, time
+import os
+
 from threading import Thread
-import queue
+from queue import Queue
 
-from hal import hal_led as led
-from hal import hal_lcd as LCD
-from hal import hal_adc as adc
-from hal import hal_buzzer as buzzer
-from hal import hal_keypad as keypad
-from hal import hal_moisture_sensor as moisture_sensor
-from hal import hal_input_switch as input_switch
-from hal import hal_ir_sensor as ir_sensor
-from hal import hal_rfid_reader as rfid_reader
-from hal import hal_servo as servo
-from hal import hal_temp_humidity_sensor as temp_humid_sensor
-from hal import hal_usonic as usonic
-from hal import hal_dc_motor as dc_motor
-from hal import hal_accelerometer as accel
+booksDB = MongoDB('books2')
+usersDB = MongoDB('users')
+currentDate = datetime.now()
+lcdMessageQueue = Queue()
 
-#Empty list to store sequence of keypad presses
-shared_keypad_queue = queue.Queue()
+# FOR PI: SCAN CARD-> HANDLE LOAN -> BORROW BOOK -> DISPENSE BOOK
+def defaultRFIDMessage():
+    lcdMessageQueue.put((0,"Tap RFID", "w Student Card", "clr"))
 
+def defaultBarcodeMessage():
+    lcdMessageQueue.put((0,"Scan Barcode", "w The Camera", "clr"))
 
+def dispenseBook(bookId):
+    lcdMessageQueue.put((0,f"Book ID: {bookId}","","clr"))
+    PiMotor.set_motor_speed(100)  # set motor to dispense book
+    PiLed.set_output(24,1) #turn led on
+    sleep(1)
+    PiMotor.set_motor_speed(0)  # to stop the dispensing motor
+    PiLed.set_output(24,0)  #turn led off
 
+    lcdMessageQueue.put((2,"","Dispensed!",""))
 
-#Call back function invoked when any key on keypad is pressed
-def key_pressed(key):
-    shared_keypad_queue.put(key)
+# deductFromCard returns False when an error occurs
+def deductFromCard(cardBal: float, loanDue: float, dataDict: dict):
+    
+    # Determine new balance of card
+    newBal = ('%f' % (cardBal - loanDue)).rstrip('0').rstrip('.') # Weird trick to format float
+    dataDict['cash'] = newBal
+    writeData = json.dumps(dataDict) # Prepare data to be written
 
+    # Try about 100 times
+    for _ in range(100):
+        foundFlag = False
+        id, data = my_reader.read_no_block()
 
-def main():
-    #initialization of HAL modules
-    led.init()
-    adc.init()
-    buzzer.init()
-  
-    moisture_sensor.init()
-    input_switch.init()
-    ir_sensor.init()
-    reader = rfid_reader.init()
-    servo.init()
-    temp_humid_sensor.init()
-    usonic.init()
-    dc_motor.init()
-    accelerometer = accel.init()
+        # Guards invalid data (or no data)
+        if not data:
+            # If data does not exist
+            continue
+        elif "Error" in data:
+            # If error detected in read
+            print("Error detected")
+            continue
+        else:
+            foundFlag = True
+            break
 
-    keypad.init(key_pressed)
-    keypad_thread = Thread(target=keypad.get_key)
-    keypad_thread.start()
-
-    lcd = LCD.lcd()
-    lcd.lcd_clear()
-
-    lcd.lcd_display_string("Mini-Project", 1)
-    lcd.lcd_display_string("Dignostic Tests", 2)
-
-    time.sleep(3)
-
-    print("press 0 to test accelerometer")
-    print("press 1 to test LED")
-    print("press 2 to test potentiometer")
-    print("press 3 to test buzzer")
-    print("press 4 to test moizture sensor")
-    print("press 5 to test ultrasonic sensor")  
-    print("press 6 to test rfid reader") 
-    print("press 7 to test LDR") 
-    print("press 8 to test servo & DC motor") 
-    print("press 9 to test temp & humidity")   
-    print("press # to test slide switch")  
-    print("print * to test IR sensor")
+    if not foundFlag:
+        return False
+    
+    # Card should still be on the reader at this point
+    try:
+        my_reader.write(writeData)
+    except IndexError:
+        return False
+    else:
+        return True
 
 
-    while(True):
-        lcd.lcd_clear()
-        lcd.lcd_display_string("press any key!", 1)
-     
+def LCD_Message_Worker():
+    def LCDPrint(duration: float = 0, msg1: str = "", msg2: str = "", *args):
+        if args:
+            if args[0] == "clr":
+                my_lcd.lcd_clear()
+        my_lcd.lcd_display_string(msg1,1)
+        my_lcd.lcd_display_string(msg2,2)
+        sleep(duration)
 
-        print("wait for key")
-        keyvalue= shared_keypad_queue.get()
 
-        print("key value ", keyvalue)
+    while True:
+        # Get stuff 
+        LCDPrint(*lcdMessageQueue.get())
+        lcdMessageQueue.task_done()
+
+
+
+# handlePayment returns True when user does not have a loan or 
+# when payment is finished
+def handlePaymentProcess(userId) -> bool:
+    # Retrieve user information from the database based on userId
+    users = usersDB.getItems(filter={"studentId": userId})
+    user = users[0]
+
+    # Check if the user has a loan and reserved books
+    if not (loanDue := user.get('loan')):
+        return True
+    
+    lcdMessageQueue.put((0,f"Loan: ${loanDue}","Tap RFID card","clr"))
+    # Delay added so that you tap at 2 separate instances
+    # Start the timer
+    start_time = time()
+
+    # Continuously read RFID until a valid ID is detected or timeout occurs
+    while True:
+        sleep(0.25)
+        current_time = time()
+        elapsed_time = current_time - start_time
+
+        # Check if timeout (30 seconds) has been reached
+        if elapsed_time >= 30:
+            lcdMessageQueue.put((1,f"Timeout, please","try again","clr"))
+            return False # need to reset the whole system after this break
+
+        id, data = my_reader.read_no_block()
+
+        # Guard incorrect data
+        if not data: # If data exists
+            continue
+        elif "Error" in data: # If error detected in read
+            print("Error detected in read")
+            continue
+        elif data.find("{") == -1 or data.find("}") == -1:
+            # If card is not json object
+            print("Cannot find {} in card")
+            continue
+
+        data = data[data.find("{"):data.find("}")+1]
+        dataDict = json.loads(data) # Load data as json object
+
+
+        # Assume keypair is of correct type
+        if (cardBal := float(dataDict.get('cash'))) < float(loanDue):
+            # Insufficient funds
+            lcdMessageQueue.put((2,"Low funds,","Please try again","clr"))
+            continue
+        else:
+
+            # Subtract from RFID
+            status = deductFromCard(cardBal, loanDue, dataDict)
+            if not status:
+                print("Error: Could not deduct from card")
+                continue
+            
+            # Clear user's loan from database
+            usersDB.unsetItem({"studentId": userId}, "loan")
+            lcdMessageQueue.put((2,"Thank you!","Payment done!","clr"))
+            break  # Exit the loop after successful payment
+    return True
         
 
-        if(keyvalue == 1): 
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)
-            lcd.lcd_display_string("LED TEST ", 2)
-            led.set_output(1, 1)
-            time.sleep(2)
-            led.set_output(1, 0)
-            time.sleep(2)
 
-        elif (keyvalue == 2):
-            pot_val = adc.get_adc_value(1)
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)
-            lcd.lcd_display_string("potval " +str(pot_val), 2)
-            time.sleep(2)
+def borrow_book_from_db(userId):
+    my_lcd.lcd_clear()
+    bookCriteria = {"status.reserved":userId}
+    books = booksDB.getItems(filter=bookCriteria)
+    if len(books) > 0:
+        for book in books:
+            print(f"Dispensing book with name: {book['name']}")
 
-        elif (keyvalue == 3):
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)
-            lcd.lcd_display_string("Buzzer TEST ", 2)
-            buzzer.beep(0.5, 0.5, 1)
+            dispenseThread = Thread(target= dispenseBook, args=(book['id']))
+            dispenseThread.start()
 
-        elif (keyvalue == 4):
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)
-            sensor_val = moisture_sensor.read_sensor()
-            lcd.lcd_display_string("moisture " +str(sensor_val), 2)
-            time.sleep(2)
+            booksDB.unsetItem(search={'id':book.get("id")},field="status.reserved")
+            booksDB.setItem(search={'id':book.get("id")},doc={"status.owner":userId})
+            usersDB.setItem(search={'studentId':userId}, doc={f"borrowedBooks.{book.get('id')}":
+                                                              (currentDate + timedelta(days=18)).strftime("%d/%m/%y")})
+    else:
+        lcdMessageQueue.put((1,"Found 0","Reservations!","clr")) #display on lcd if no book reservations
 
-        elif (keyvalue == 5):
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)            
-            sensor_val = usonic.get_distance()
-            lcd.lcd_display_string("distance " +str(sensor_val), 2)
-            time.sleep(2)   
 
-        elif (keyvalue == 6):
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)           
-            id = reader.read_id_no_block()
-            id = str(id)
+# authUserProcess gets the userId of the collector via RFID and returns its value
+# This function is the start of the entire process       
+def authRFIDProcess() -> str:
+    # Instructions for user
+    defaultRFIDMessage()
+    data = None
+    # Check for userId
+    while True: 
+        while not data:
+            id, data = my_reader.read() # Wait for data
+
+        # Guard incorrect data
+        if "Error" in data: # If error detected in read
+            print("Error detected in read")
+            continue
+        elif data.find("{") == -1 or data.find("}") == -1:
+            # If card is not json object
+            print("Cannot find \{\} in card")
+            continue
+
+        data = data[data.find("{"):data.find("}")+1]
+        dataDict = json.loads(data) # Load data as json object
+
+        # If the data contains a value for userId
+        if userId := dataDict.get('userId'):
+            break # Break the loop to proceed
+    
+    # Information to user
+    lcdMessageQueue.put((2,"Registered as",f"{userId}","clr"))
+    # Pause for a short while
+    return userId # Return the value of userId to be used
+
+def barcodeListener() -> str:
+    txt_path = os.path.join(os.path.dirname(__file__), 'images\data.txt')
+    while True:
+        with open(txt_path) as f1:
+            data = f1.read()
+            if data:
+                return data
+
+def authBarcodeProcess() -> str:
+    while True:
+        # Read in data.txt
+        data = barcodeListener()
+        if len(data) != 8: # Guard data by length
+            continue
+        # Information to user
+        lcdMessageQueue.put((2,"Registered as",f"{data}","clr"))
+        # Pause for a short while
+        return data
+                
+
+def ADMIN_setup_card():
+    x = {
+        "userId": "P2302223",
+        "cash": 30,
+        }
+    y = json.dumps(x)
+    my_reader.write(y)
+
+
+def calculateLoan(books:dict) -> float:
+    # Expects books to be in the example format:
+    # {"1":"01/01/01"}
+    totalLoan = 0
+    for date in books.values():
+        # Get the date
+        dueDate = datetime.strptime(date, "%d/%m/%y")
+        loanDays = (currentDate - dueDate).days
+        if loanDays > 0:
+            # Payment to be made
+            loan = loanDays * 0.15
+            print(f"You have accumulated a loan of ${loan}")
+            # Calculate loan
+            totalLoan += loan
+    
+    
+    return round(totalLoan,2)
+
+
+def ADMIN_returnUserBooks(userId: str):
+    # From userId, retrieve borrowed books
+    totalLoan = 0
+    users = usersDB.getItems(filter={"studentId": userId})
+    for user in users:
+        # Expect only one user
+        borrowedBooks = user.get("borrowedBooks")
+        totalLoan = calculateLoan(borrowedBooks)
+        print(totalLoan)
+        # Update loan on database
+        if currentLoan := user.get("loan"):
+            totalLoan += float(currentLoan)
+
+        usersDB.setItem(search={"studentId": userId},doc={"loan":totalLoan})
         
-            if id != "None":
-                print("RFID card ID = " + id)
-                # Display RFID card ID on LCD line 2
-                lcd.lcd_display_string(id, 2) 
-            time.sleep(2)   
 
-        elif (keyvalue == 7):
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)            
-            pot_val = adc.get_adc_value(0)
-            lcd.lcd_display_string("LDR " +str(pot_val), 2)
-            time.sleep(2)
+        for bookId in borrowedBooks.keys():
+            # Removes owner status from book
+            booksDB.unsetItem(search={"id":bookId},field="status.owner")
+            # Removes loanExtension from book
+            booksDB.unsetItem(search={"id":bookId},field="status.loanExtended")
+            # Removes book from user inventory
+            usersDB.unsetItem(search={ "$and": [ {"studentId": userId, f"borrowedBooks.{bookId}": {"$exists": "true"}}]}, 
+                              field=f"borrowedBooks.{bookId}")
 
-        elif (keyvalue == 8):
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)     
-            lcd.lcd_display_string("servo/DC test ", 2)  
-            servo.set_servo_position(20)
-            time.sleep(1)  
-            servo.set_servo_position(80)
-            time.sleep(1)     
-            servo.set_servo_position(120)
-            time.sleep(1)            
-            dc_motor.set_motor_speed(50)
-            time.sleep(4)   
-            dc_motor.set_motor_speed(0)
-            time.sleep(2) 
 
-        elif (keyvalue == 9):
-            temperature, humidity = temp_humid_sensor.read_temp_humidity()
-            lcd.lcd_display_string("Temperature "  +str(temperature), 1)  
-            lcd.lcd_display_string("Humidity "  +str(humidity), 2) 
-            time.sleep(2)  
-
-        elif (keyvalue == "#"):
-            sw_switch = input_switch.read_slide_switch()
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)    
-            lcd.lcd_display_string("switch "  +str(sw_switch), 2) 
-            time.sleep(2)  
+def ADMIN_returnBook(bookId: str):
+    bookId = str(bookId)
+    # Get user object by the borrowedBook ID
+    users = usersDB.getItems(filter={f"borrowedBooks.{bookId}": {"$exists": "true"}})
+    for user in users:
+        # Expect only one user
+        date = user.get("borrowedBooks").pop(bookId)
+        totalLoan = calculateLoan({bookId:date})
+        print(totalLoan)
+        # Update loan on database
+        if currentLoan := user.get("loan"):
+            totalLoan += float(currentLoan)
         
-        elif (keyvalue == "*"):
-            ir_value = ir_sensor.get_ir_sensor_state()
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1)    
-            lcd.lcd_display_string("ir sensor "  +str(ir_value), 2) 
-            time.sleep(2)  
-        
-        elif (keyvalue == 0):
-            x_axis, y_axis, z_axis = accelerometer.get_3_axis_adjusted()
-            lcd.lcd_display_string("key pressed "  +str(keyvalue), 1) 
-            lcd.lcd_display_string("x " +str(x_axis), 2) 
-            time.sleep(2) 
-            lcd.lcd_clear()
-            lcd.lcd_display_string("y " +str(y_axis), 1) 
-            lcd.lcd_display_string("z " +str(z_axis), 2) 
-            print(x_axis)
-            print(y_axis)
-            print(z_axis)  
-
-            time.sleep(2)  
-       
+        usersDB.setItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, doc={"loan":totalLoan})
 
 
-        time.sleep(1)
-
-
-
-def init():
-    GPIO.setmode(GPIO.BCM)  
-    GPIO.setwarnings(False)
-    GPIO.setup(18, GPIO.OUT)  # choose GPIO pin XX as output
-
-
-def high():
-    GPIO.output(18, 1)  # Turn on buzzer
-
-
-def low():
-    GPIO.output(18, 0)  # Turn off buzzer
+        # Removes owner status from book
+        booksDB.unsetItem(search={"id":bookId},field="status.owner")
+        # Removes loanExtension from book
+        booksDB.unsetItem(search={"id":bookId},field="status.loanExtended")
+        # Removes book from user inventory
+        usersDB.unsetItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, field=f"borrowedBooks.{bookId}")
 
 
 def timer(duration):
-    high()
+    GPIO.output(18, 1)  # Turn on buzzer
     time.sleep(duration)  # Duration to turn on the buzzer
-    low()
+    GPIO.output(18, 0)  # Turn off buzzer
 
 
 def beep(ontime, offtime, repeatnum):
     for cnt in range(repeatnum):
-        high()
+        GPIO.output(18, 1)  # Turn on buzzer
         time.sleep(ontime)
-        low()
+        GPIO.output(18, 0)  # Turn off buzzer
         time.sleep(offtime)
 
 
-if __name__ == '__main__':
+def main():
+    # While true
+    while True:
+        userId = authRFIDProcess()
+        sleep(2)
+        status = handlePaymentProcess(userId)
+        if status:
+            # Payment has been made
+            borrow_book_from_db(userId)
+            sleep(2)
+        else:
+            # Payment was not made
+            continue # Start from beginning
+    # If camera detects card, check loans (pay loans via RFID, or timeout and restart) -> dispense books -> updateDB
+
+
+def init():
+    import RPi.GPIO as GPIO
+    from hal import hal_dc_motor as PiMotor
+    from hal import hal_led as PiLed
+    from hal import hal_lcd as PiLcd
+    from hal import hal_rfid_reader as PiReader
+    # Init LCD
+    global my_lcd
+    my_lcd = PiLcd.lcd()
+
+    # Init LED
+    PiLed.init()
+
+    # Init Motor
+    PiMotor.init()
+
+    # Init RFID Reader
+    global my_reader
+    my_reader = PiReader.init()
+
+    # Display 
+    my_lcd.lcd_clear()
+    my_lcd.lcd_display_string("Initialising", 1)
+    my_lcd.lcd_display_string("...", 2)
+
+    # Start LCD_Message_Worker
+    Thread(target=LCD_Message_Worker, daemon=False).start()
+
+    # Init Camera
+    pass
+
+if __name__ == "__main__":
+    print("""
+
+    -INITIALISING-
+
+    """)
+
+    init()
+    
+    print( """
+
+    -CALLING MAIN-
+
+    """)
+
     main()
+

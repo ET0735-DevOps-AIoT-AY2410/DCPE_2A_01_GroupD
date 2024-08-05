@@ -1,0 +1,4 @@
+.env
+.vscode
+__pycache__/
+src/images/data.txt
