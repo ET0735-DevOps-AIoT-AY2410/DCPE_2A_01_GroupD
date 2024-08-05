@@ -3,7 +3,7 @@ from threading import Thread
 import os
 from time import sleep
 from main import authBarcodeProcess, barcodeListener, calculateLoan
-from datetime import date, datetime, timedelta
+from datetime import datetime
 
 # This function can never fail
 def test_authBarcodeProcess():

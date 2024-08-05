@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import json
 from mongoApi import MongoDB
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from time import sleep, time
 import os
 
@@ -355,7 +355,7 @@ if __name__ == "__main__":
     -INITIALISING-
 
     """)
-    
+
     init()
     
     print( """
