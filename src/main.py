@@ -299,20 +299,6 @@ def ADMIN_returnBook(bookId: str):
         usersDB.unsetItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, field=f"borrowedBooks.{bookId}")
 
 
-def timer(duration):
-    GPIO.output(18, 1)  # Turn on buzzer
-    time.sleep(duration)  # Duration to turn on the buzzer
-    GPIO.output(18, 0)  # Turn off buzzer
-
-
-def beep(ontime, offtime, repeatnum):
-    for cnt in range(repeatnum):
-        GPIO.output(18, 1)  # Turn on buzzer
-        time.sleep(ontime)
-        GPIO.output(18, 0)  # Turn off buzzer
-        time.sleep(offtime)
-
-
 def main():
     # While true
     while True:
