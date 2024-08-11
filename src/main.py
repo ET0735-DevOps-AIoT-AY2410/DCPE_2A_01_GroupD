@@ -382,8 +382,8 @@ def init():
     my_lcd.lcd_display_string("...", 2)
 
     # Start LCD_Message_Worker
-    Thread(target=LCD_Message_Worker, daemon=False).start()
-    Thread(target=MongoDB_Worker).start()
+    Thread(target=LCD_Message_Worker, daemon=True).start()
+    Thread(target=MongoDB_Worker, daemon=True).start()
 
     # Init Camera
     pass
