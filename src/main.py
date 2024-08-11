@@ -237,18 +237,24 @@ def authRFIDProcess() -> str:
 
 
 def barcodeListener() -> str:
-    txt_path = os.path.join(os.path.dirname(__file__), 'images\data.txt')
+    txt_path = os.path.join(os.path.dirname(__file__), 'images/data.txt')
     while True:
-        with open(txt_path) as f1:
+        with open(txt_path, "r+") as f1:
             data = f1.read()
             if data:
+                f1.seek(0)
+                f1.truncate()
                 return data
 
 
 def authBarcodeProcess() -> str:
+    defaultBarcodeMessage()
     while True:
         # Read in data.txt
         data = barcodeListener()
+        if len(data[3:]) == 7:
+            # For some reason, by admin card shows 2002302746
+            data = "P" + data[3:]
         if len(data) != 8: # Guard data by length
             continue
         # Information to user
@@ -337,7 +343,7 @@ def main():
     # While true
     while True:
         currentDate = datetime.now()
-        userId = authRFIDProcess()
+        userId = authBarcodeProcess()
         my_buzzer.playTone("C4")
         sleep(2)
         status = handlePaymentProcess(userId)
