@@ -78,9 +78,28 @@ def deductFromCard(cardBal: float, loanDue: float, dataDict: dict):
         return False
     else:
         return True
+    
+
+def MongoDB_Worker(): # The worker that controls some of the database
+    # Cancel reserved books after 5 days if not collected
+    while True:
+        users = usersDB.getItems(filter={f"reservedBooks": {"$exists": "true"}})
+        for user in users:
+            reservedBooks = user.get('reservedBooks')
+            # Reserved books is an object
+            for bookId, dateString in reservedBooks.items():
+                dueDate = datetime.strptime(dateString, "%d/%m/%y") # Parse duedate into time format
+                if currentDate > dueDate:
+                    print(f"Book {bookId} is being unreserved from {user.get('studentId')}")
+                    # Unreserve the book
+                    booksDB.unsetItem(search={'id':bookId}, field="status.reserved")
+                    usersDB.unsetItem(search={'studentId':user.get('studentId')}, field=f"reservedBooks.{bookId}")
 
 
-def LCD_Message_Worker():
+
+        sleep(3600) # Runs check every hour
+
+def LCD_Message_Worker(): # The worker that allows for buffering of LCD displayed data
     def LCDPrint(duration: float = 0, msg1: str = "", msg2: str = "", *args):
         if args:
             if args[0] == "clr":
@@ -314,8 +333,10 @@ def ADMIN_returnBook(bookId: str):
 
 
 def main():
+    global currentDate
     # While true
     while True:
+        currentDate = datetime.now()
         userId = authRFIDProcess()
         my_buzzer.playTone("C4")
         sleep(2)
@@ -356,6 +377,7 @@ def init():
 
     # Start LCD_Message_Worker
     Thread(target=LCD_Message_Worker, daemon=False).start()
+    Thread(target=MongoDB_Worker).start()
 
     # Init Camera
     pass
