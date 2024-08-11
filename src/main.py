@@ -111,6 +111,7 @@ def LCD_Message_Worker(): # The worker that allows for buffering of LCD displaye
 
     while True:
         # Get stuff 
+        sleep(0.25)
         LCDPrint(*lcdMessageQueue.get())
         lcdMessageQueue.task_done()
 
@@ -120,8 +121,13 @@ def LCD_Message_Worker(): # The worker that allows for buffering of LCD displaye
 def handlePaymentProcess(userId) -> bool:
     # Retrieve user information from the database based on userId
     users = usersDB.getItems(filter={"studentId": userId})
-    user = users[0]
-
+    try:
+        user = users[0]
+    except IndexError:
+        # No user registered
+        lcdMessageQueue.put((1,f"User Not","Registered!","clr"))
+        return False # need to reset the whole system after this break
+    
     # Check if the user has a loan and reserved books
     if not (loanDue := user.get('loan')):
         return True
@@ -220,7 +226,7 @@ def authRFIDProcess() -> str:
             continue
         elif data.find("{") == -1 or data.find("}") == -1:
             # If card is not json object
-            print("Cannot find \{\} in card")
+            print("Cannot find {} in card")
             continue
 
         data = data[data.find("{"):data.find("}")+1]
@@ -250,6 +256,7 @@ def barcodeListener() -> str:
 def authBarcodeProcess() -> str:
     defaultBarcodeMessage()
     while True:
+        sleep(0.25)
         # Read in data.txt
         data = barcodeListener()
         if len(data[3:]) == 7:
