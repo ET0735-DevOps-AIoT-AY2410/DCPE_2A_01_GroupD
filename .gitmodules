@@ -4,3 +4,6 @@
 [submodule "src/SP_DevOps_MiniProject_GroupD_Frontend"]
 	path = src/SP_DevOps_MiniProject_GroupD_Frontend
 	url = https://github.com/Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend.git
+[submodule "src/SPI-Py"]
+	path = src/SPI-Py
+	url = https://github.com/lthiery/SPI-Py.git
