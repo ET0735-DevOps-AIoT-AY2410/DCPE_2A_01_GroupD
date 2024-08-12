@@ -6,11 +6,11 @@ from datetime import date, datetime, timedelta
 booksDB = MongoDB('books2')
 usersDB = MongoDB('users')
 
-
 # Reset Loans, User inventory and Book statuses
 def softResetDB():
     booksDB.setItems(search={},doc={"status":{}})
     usersDB.setItems(search={},doc={"borrowedBooks":{}})
+    usersDB.setItems(search={},doc={"reservedBooks":{}})
     usersDB.unsetItems(search={},field="loan")
 
 def calculateLoan(books:dict) -> float:
@@ -31,6 +31,7 @@ def calculateLoan(books:dict) -> float:
     
     
     return round(totalLoan,2)
+
 
 def ADMIN_returnBook(bookId: str):
     bookId = str(bookId)
@@ -54,7 +55,31 @@ def ADMIN_returnBook(bookId: str):
         booksDB.unsetItem(search={"id":bookId},field="status.loanExtended")
         # Removes book from user inventory
         usersDB.unsetItem(search={f"borrowedBooks.{bookId}": {"$exists": "true"}}, field=f"borrowedBooks.{bookId}")
+
+
+def ADMIN_returnUserBooks(userId: str):
+    # From userId, retrieve borrowed books
+    totalLoan = 0
+    users = usersDB.getItems(filter={"studentId": userId})
+    for user in users:
+        # Expect only one user
+        borrowedBooks = user.get("borrowedBooks")
+        totalLoan = calculateLoan(borrowedBooks)
+        print(totalLoan)
+        # Update loan on database
+        if currentLoan := user.get("loan"):
+            totalLoan += float(currentLoan)
+
+        usersDB.setItem(search={"studentId": userId},doc={"loan":totalLoan})
         
+        for bookId in borrowedBooks.keys():
+            # Removes owner status from book
+            booksDB.unsetItem(search={"id":bookId},field="status.owner")
+            # Removes loanExtension from book
+            booksDB.unsetItem(search={"id":bookId},field="status.loanExtended")
+            # Removes book from user inventory
+            usersDB.unsetItem(search={ "$and": [ {"studentId": userId, f"borrowedBooks.{bookId}": {"$exists": "true"}}]}, 
+                              field=f"borrowedBooks.{bookId}")
 # Example user:
 """
 _id: ObjectId
@@ -65,6 +90,9 @@ loan? : Double
 borrowedBooks : {
     bookId?: String("DD/MM/YY")
     ...
+}
+reservedBooks : {
+    bookId?: String("DD?MM/YY")
 }
 """
 # Example book:
