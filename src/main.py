@@ -202,6 +202,7 @@ def borrow_book_from_db(userId):
             my_buzzer.playTone("E6",0.46)
 
             booksDB.unsetItem(search={'id':book.get("id")},field="status.reserved")
+            usersDB.unsetItem(search={'studentId':userId},field=f"reservedBooks.{book.get('id')}")
             booksDB.setItem(search={'id':book.get("id")},doc={"status.owner":userId})
             usersDB.setItem(search={'studentId':userId}, doc={f"borrowedBooks.{book.get('id')}":
                                                               (currentDate + timedelta(days=18)).strftime("%d/%m/%y")})
