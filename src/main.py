@@ -269,6 +269,17 @@ def authBarcodeProcess() -> str:
         # Pause for a short while
         return data
                 
+def isInventoryFull(userId) -> bool:
+    users = usersDB.getItems(filter={'studentId':userId})
+    for user in users:
+        books = user.get('borrowedBooks')
+        if len(books) >= 10:
+            # Inventory is full
+            return True
+        else:
+            return False
+
+
 
 def ADMIN_setup_card():
     x = {
@@ -356,8 +367,12 @@ def main():
         status = handlePaymentProcess(userId)
         if status:
             # Payment has been made
-            borrow_book_from_db(userId)
-            sleep(2)
+            if not isInventoryFull(userId):
+                borrow_book_from_db(userId)
+                sleep(2)
+            else:
+                # Cannot borrow books anymore
+                lcdMessageQueue.put((2,"You have >","10 Books","clr"))
         else:
             # Payment was not made
             continue # Start from beginning
