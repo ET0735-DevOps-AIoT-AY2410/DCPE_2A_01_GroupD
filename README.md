@@ -36,7 +36,9 @@ The following features can be broken down into the Frontend as well as the Raspb
 - The front end was developed using react-native. However, due to CORS error, is unable to run on the web browser.
 - The repo includes `mongoDBControl.py` which is used for administrative control such as resetting the database
 - The Raspberry Pi system will not run without the proper API key for MongoDB. The API key is read by the program via `.env` files but is not included in the repository.
+- Find the Frontend here:
 
+<a href="https://github.com/Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend"><img src="https://github-link-card.s3.ap-northeast-1.amazonaws.com/Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend.png" width="460px"></a>
 # Execution
 The following is how to use the project:
 ## Using Docker to run main.py
