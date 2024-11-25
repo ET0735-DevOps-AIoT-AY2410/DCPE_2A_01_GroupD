@@ -38,7 +38,7 @@ The following features can be broken down into the Frontend as well as the Raspb
 - The Raspberry Pi system will not run without the proper API key for MongoDB. The API key is read by the program via `.env` files but is not included in the repository.
 - Find the Frontend here:
 
-<a href="https://github.com/Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend"><img src="https://github-link-card.s3.ap-northeast-1.amazonaws.com/Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend.png" width="460px"></a>
+[![Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend - GitHub](https://gh-card.dev/repos/Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend.svg)](https://github.com/Leroy-Hong/SP_DevOps_MiniProject_GroupD_Frontend)
 # Execution
 The following is how to use the project:
 ## Using Docker to run main.py
